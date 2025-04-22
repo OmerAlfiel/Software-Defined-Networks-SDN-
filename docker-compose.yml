@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  controller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sdn_controller
+    ports:
+      - "6653:6653"
+    networks:
+      sdn_network:
+        ipv4_address: 172.20.0.2
+    healthcheck:
+      test: ["CMD", "netstat", "-tuln", "|", "grep", "6653"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  ns3:
+    build:
+      context: .
+      dockerfile: ns3.Dockerfile
+    container_name: sdn_ns3
+    depends_on:
+      controller:
+        condition: service_healthy
+    privileged: true  # Needed for TAP interface
+    networks:
+      sdn_network:
+        ipv4_address: 172.20.0.4
+    volumes:
+      - ./ns3:/ns3/scratch
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+
+networks:
+  sdn_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

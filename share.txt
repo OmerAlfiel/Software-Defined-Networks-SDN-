@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Create necessary TAP interface for communication between NS-3 and Ryu
+sudo ip link delete ctrl 2>/dev/null || true
+sudo ip tuntap add dev ctrl mode tap user $(whoami)
+sudo ip link set dev ctrl up
+sudo ip addr add 10.100.0.1/24 dev ctrl
+
+# Enable IP forwarding
+sudo sysctl -w net.ipv4.ip_forward=1
+
+# Disable firewall for testing
+sudo iptables -F
+
+# Start the Ryu controller with all VNFs
+cd ~/SDN-project
+echo "Starting Ryu controller with all VNFs..."
+ryu-manager --verbose --ofp-listen-host=0.0.0.0 --ofp-tcp-listen-port=6653 \
+  controller/sdn_controller.py \
+  controller/firewall_vnf.py \
+  controller/load_balancer_vnf.py

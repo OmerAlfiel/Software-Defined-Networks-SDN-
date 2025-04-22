@@ -1,0 +1,4 @@
+ryu>=4.34
+pytest>=7.0.0
+pyflakes>=2.4.0
+pylint>=2.12.2

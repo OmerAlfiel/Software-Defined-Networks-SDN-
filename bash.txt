@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# SDN Project Implementation Script
+# Save this as run_sdn_project.sh and run with: bash run_sdn_project.sh
+
+echo "===== SDN Project Implementation Guide ====="
+
+# Step 1: Setup project directories
+echo "Step 1: Setting up project directories..."
+mkdir -p ~/SDN-project/controller ~/SDN-project/ns3
+cd ~/SDN-project
+# Expected output: No output, directories created successfully
+
+# Step 2: Install required Python dependencies
+echo "Step 2: Installing required Python dependencies..."
+pip install ryu eventlet==0.30.2 six>=1.9.0 msgpack>=0.3.0 oslo.config>=1.15.0 ovs>=2.6.0
+# Expected output: Successfully installed ryu-4.34 eventlet-0.30.2 six-1.16.0 msgpack-1.0.5 oslo.config-9.1.1 ovs-2.17.1
+
+# Step 3: Create the controller and NS-3 source files
+echo "Step 3: You need to create the following files:"
+echo "- controller/sdn_controller.py - Basic SDN controller"
+echo "- controller/firewall_vnf.py - Firewall implementation"
+echo "- controller/load_balancer_vnf.py - Load balancer implementation"
+echo "- ns3/topology.cc - NS-3 topology with OpenFlow support"
+
+
+# Step 4: Copy the NS-3 topology to the scratch directory
+echo "Step 4: Copying NS-3 topology to scratch directory..."
+cp ns3/topology.cc ~/workspace/bake/source/ns-3.38/scratch/
+# Expected output: No output if file copies successfully
+
+# Step 5: Build the NS-3 topology
+echo "Step 5: Building NS-3 topology..."
+cd ~/workspace/bake/source/ns-3.38
+./ns3 build
+# Expected output: 'build' finished successfully
+
+# Step 6: Running the SDN environment
+echo "Step 6: Running the SDN environment"
+echo "First terminal - Start basic SDN controller:"
+echo "cd ~/SDN-project"
+echo "ryu-manager controller/sdn_controller.py"
+# Expected output:
+# loading app controller/sdn_controller.py
+# instantiating app controller/sdn_controller.py
+# Controller initialized
+
+echo ""
+echo "First terminal - Run controller with firewall VNF:"
+echo "cd ~/SDN-project"
+echo "ryu-manager controller/sdn_controller.py controller/firewall_vnf.py"
+# Expected output:
+# loading app controller/sdn_controller.py
+# loading app controller/firewall_vnf.py
+# instantiating app controller/sdn_controller.py
+# instantiating app controller/firewall_vnf.py
+# Controller initialized
+# Firewall VNF initialized
+
+echo ""
+echo "First terminal - Run controller with load balancer VNF:"
+echo "cd ~/SDN-project"
+echo "ryu-manager controller/sdn_controller.py controller/load_balancer_vnf.py"
+# Expected output:
+# loading app controller/sdn_controller.py
+# loading app controller/load_balancer_vnf.py
+# instantiating app controller/sdn_controller.py
+# instantiating app controller/load_balancer_vnf.py
+# Controller initialized
+# Load Balancer VNF initialized
+
+echo ""
+echo "First terminal - Run controller with both VNFs:"
+echo "cd ~/SDN-project"
+echo "ryu-manager controller/sdn_controller.py controller/firewall_vnf.py controller/load_balancer_vnf.py"
+# Expected output:
+# loading app controller/sdn_controller.py
+# loading app controller/firewall_vnf.py
+# loading app controller/load_balancer_vnf.py
+# instantiating app controller/sdn_controller.py
+# instantiating app controller/firewall_vnf.py
+# instantiating app controller/load_balancer_vnf.py
+# Controller initialized
+# Firewall VNF initialized
+# Load Balancer VNF initialized
+
+echo ""
+echo "Second terminal - Run the NS-3 simulation:"
+echo "cd ~/workspace/bake/source/ns-3.38"
+echo "./ns3 run \"scratch/topology --verbose=1\""
+# Expected output:
+# Creating OpenFlow test topology with three nodes and a switch
+# Controller connecting to 127.0.0.1:6653
+# Starting simulation...
+
+echo ""
+echo "Expected controller output when switch connects:"
+# Expected output: 
+# Switch connected: 1
+
+echo ""
+echo "Expected controller output when firewall is active:"
+# Expected output:
+# Packet in from switch 0000000000000001: 00:00:00:00:00:01 -> 00:00:00:00:00:02 on port 1
+# Blocking traffic: block_h1_to_h2 - 10.0.0.1 -> 10.0.0.2
+# Packet in from switch 0000000000000001: 00:00:00:00:00:01 -> 00:00:00:00:00:03 on port 1
+# Blocking traffic: block_http_to_h3 - 10.0.0.1 -> 10.0.0.3 TCP port 80
+
+echo ""
+echo "Expected controller output when load balancer is active:"
+# Expected output:
+# Selected server 10.0.0.2 for client 10.0.0.1
+# Load balanced: 10.0.0.1 -> VIP:10.0.0.100 redirected to 10.0.0.2
+
+echo ""
+echo "Expected NS-3 terminal output during simulation:"
+# Expected output:
+# Host 0 MAC: 00:00:00:00:00:01
+# Host 0 IP: 10.0.0.1
+# Host 1 MAC: 00:00:00:00:00:02
+# Host 1 IP: 10.0.0.2
+# Host 2 MAC: 00:00:00:00:00:03
+# Host 2 IP: 10.0.0.3
+# PING 10.0.0.2 - 56 bytes of data - no response - icmp_seq=1 timeout
+# PING 10.0.0.3 - 56 bytes of data - 64 bytes from 10.0.0.3: icmp_seq=1 ttl=64 time=5.623 ms
+# PING 10.0.0.100 - 56 bytes of data - 64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=7.246 ms
+
+echo ""
+echo "===== End of SDN Project Implementation Guide ====="
