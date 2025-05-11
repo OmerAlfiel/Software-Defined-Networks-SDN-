@@ -1,0 +1,5 @@
+scenario,latency
+Direct Forwarding (no VNFs),2.3
+With Firewall VNF,3.8
+With Load Balancer VNF,4.5
+With Both VNFs,5.7
