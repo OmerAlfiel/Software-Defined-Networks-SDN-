@@ -57,6 +57,8 @@ main (int argc, char *argv[])
     TapBridgeHelper tap;
     tap.SetAttribute ("Mode", StringValue ("ConfigureLocal"));
     tap.SetAttribute ("DeviceName", StringValue ("ctrl"));
+    tap.SetAttribute ("Gateway", Ipv4AddressValue ("10.100.0.1"));        
+    tap.SetAttribute ("Netmask", Ipv4MaskValue ("255.255.255.0"));       
     tap.Install (ctrlNode, ctrlDev);
     
     // d) Create OpenFlow channels
@@ -69,16 +71,23 @@ main (int argc, char *argv[])
     LogComponentEnable ("OFSwitch13SocketHandler", LOG_LEVEL_ALL);
     LogComponentEnable ("TapBridge", LOG_LEVEL_INFO);
 
-    // Add ping application between hosts
-    V4PingHelper ping (Ipv4Address ("10.0.0.2")); // Ping from h1 to h2
-    ping.SetAttribute ("Verbose", BooleanValue (true));
+    // Add ping application between hosts (FIXED: Removed invalid Verbose attribute)
+    PingHelper ping (Ipv4Address ("10.0.0.2")); 
+    ping.SetAttribute ("Count", UintegerValue (5));                      
     ApplicationContainer apps = ping.Install (hosts.Get (0));
-    apps.Start (Seconds (1.0));
+    apps.Start (Seconds (2.0)); 
+    apps.Stop (Seconds (8.0));   
 
     // 7) Run for 10 seconds
     Simulator::Stop (Seconds (10.0));
+    
+    std::cout << "=== Starting NS-3 SDN Simulation ===" << std::endl;
+    std::cout << "Controller should connect to: 127.0.0.1:6653" << std::endl;
+    std::cout << "TAP interface: ctrl (10.100.0.1/24)" << std::endl;
+    
     Simulator::Run ();
     Simulator::Destroy ();
-
+    
+    std::cout << "=== Simulation Complete ===" << std::endl;
     return 0;
 }
