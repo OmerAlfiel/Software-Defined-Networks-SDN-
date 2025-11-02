@@ -648,7 +648,658 @@ TO VERIFY SUCCESSFUL IMPLEMENTATION:
    - Switch should connect to controller on port 6653
 
 ===================================================================
-                   TRACK 10: PERFORMANCE ANALYSIS
+                   TRACK 10: AUTOMATED TEST SCRIPTS
+===================================================================
+
+OVERVIEW:
+This section provides automated test scripts for all SDN scenarios.
+Each script includes proper cleanup, error checking, and validation.
+Use these scripts for quick testing and demonstration.
+
+PREREQUISITES:
+- Completed NS-3 setup (Track 2) for NS-3 tests
+- Completed Mininet setup (Track 1) for Mininet tests
+- All VNF files in controller/ directory
+- NS-3 topology file in ns3/ directory
+
+CRITICAL: OPEN VSWITCH CLEANUP
+------------------------------
+NS-3 tests require stopping Open vSwitch daemon before running:
+Command: sudo systemctl stop openvswitch-switch
+Command: sudo pkill -9 ovs-vswitchd
+
+Reason: The ovs-vswitchd daemon auto-connects to the Ryu controller on port 6653,
+preventing NS-3 from establishing proper OpenFlow handshake. This causes intermittent
+failures where NS-3 works first time (0% packet loss) but fails subsequent runs
+(100% packet loss).
+
+Mininet tests do NOT require stopping OVS (it uses OVS switches internally).
+
+STEP 1: MAKE SCRIPTS EXECUTABLE
+------------------------------
+Command: cd ~/SDN
+Command: chmod +x test_ns3_basic.sh test_ns3_firewall.sh test_ns3_loadbalancer.sh test_ns3_both.sh
+Command: chmod +x test_mininet_basic.sh test_mininet_firewall.sh test_mininet_loadbalancer.sh test_mininet_both.sh
+Command: chmod +x run_tests.sh
+
+Expected Output: No output (scripts now executable)
+
+STEP 2: VERIFY SCRIPT PERMISSIONS
+--------------------------------
+Command: ls -l test_*.sh run_tests.sh
+Expected Output:
+-rwxr-xr-x 1 user user 1234 Nov  1 12:00 run_tests.sh
+-rwxr-xr-x 1 user user 2345 Nov  1 12:00 test_mininet_basic.sh
+-rwxr-xr-x 1 user user 2456 Nov  1 12:00 test_mininet_both.sh
+-rwxr-xr-x 1 user user 2567 Nov  1 12:00 test_mininet_firewall.sh
+-rwxr-xr-x 1 user user 2678 Nov  1 12:00 test_mininet_loadbalancer.sh
+-rwxr-xr-x 1 user user 1890 Nov  1 12:00 test_ns3_basic.sh
+-rwxr-xr-x 1 user user 2012 Nov  1 12:00 test_ns3_both.sh
+-rwxr-xr-x 1 user user 2123 Nov  1 12:00 test_ns3_firewall.sh
+-rwxr-xr-x 1 user user 2234 Nov  1 12:00 test_ns3_loadbalancer.sh
+
+=== NS-3 AUTOMATED TESTS ===
+
+TEST 1: NS-3 BASIC L2 FORWARDING
+-------------------------------
+Script: test_ns3_basic.sh
+VNFs: None (basic MAC learning L2 switch)
+Expected: All pings succeed, flows installed for MAC learning
+
+Command: ./test_ns3_basic.sh
+
+Expected Output:
+========================================
+NS-3 SDN Test - Basic L2 Forwarding
+========================================
+
+✅ Starting cleanup...
+Cleanup complete.
+
+Starting Ryu controller (Basic L2 Forwarding)...
+Controller PID: XXXXX
+Waiting for controller to initialize...
+
+Checking for unexpected connections...
+✅ No unexpected connections found.
+
+Running NS-3 simulation...
+=== Starting NS-3 SDN Simulation ===
+Controller should connect to: 127.0.0.1:6653
+TAP interface: ctrl (10.100.0.1/24)
+[dp 1] Controller accepted connection request!
+PING 10.0.0.2 (10.0.0.2) from 10.0.0.1: 56(84) bytes of data.
+64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=55.464 ms
+64 bytes from 10.0.0.2: icmp_seq=2 ttl=64 time=28.232 ms
+64 bytes from 10.0.0.2: icmp_seq=3 ttl=64 time=14.116 ms
+64 bytes from 10.0.0.2: icmp_seq=4 ttl=64 time=7.058 ms
+64 bytes from 10.0.0.2: icmp_seq=5 ttl=64 time=3.529 ms
+=== Simulation Complete ===
+
+✅ Test completed successfully!
+========================================
+
+Verification: Look for "5 packets transmitted, 5 received, 0% packet loss"
+
+TEST 2: NS-3 FIREWALL VNF
+------------------------
+Script: test_ns3_firewall.sh
+VNFs: Firewall (blocks h1→h2 traffic)
+Expected: h1 cannot ping h2, controller shows "Blocking traffic" messages
+
+Command: ./test_ns3_firewall.sh
+
+Expected Output:
+========================================
+NS-3 SDN Test - Firewall VNF
+========================================
+
+✅ Starting cleanup...
+Cleanup complete.
+
+Starting Ryu controller (Firewall VNF)...
+Controller PID: XXXXX
+Waiting for controller to initialize...
+
+Checking for unexpected connections...
+✅ No unexpected connections found.
+
+Running NS-3 simulation with Firewall VNF...
+=== Starting NS-3 SDN Simulation ===
+[dp 1] Controller accepted connection request!
+PING 10.0.0.2 (10.0.0.2) from 10.0.0.1: 56(84) bytes of data.
+(No responses - traffic blocked by firewall)
+=== Simulation Complete ===
+
+Expected behavior: h1→h2 blocked by firewall
+Check controller logs for "Blocking traffic" messages
+========================================
+
+Verification: Look for "5 packets transmitted, 0 received, 100% packet loss"
+
+TEST 3: NS-3 LOAD BALANCER VNF
+-----------------------------
+Script: test_ns3_loadbalancer.sh
+VNFs: Load Balancer (distributes traffic to backend servers)
+Expected: Traffic to VIP distributed between servers, controller shows distribution
+
+Command: ./test_ns3_loadbalancer.sh
+
+Expected Output:
+========================================
+NS-3 SDN Test - Load Balancer VNF
+========================================
+
+✅ Starting cleanup...
+Cleanup complete.
+
+Starting Ryu controller (Load Balancer VNF)...
+Controller PID: XXXXX
+Waiting for controller to initialize...
+
+Checking for unexpected connections...
+✅ No unexpected connections found.
+
+Running NS-3 simulation with Load Balancer VNF...
+=== Starting NS-3 SDN Simulation ===
+[dp 1] Controller accepted connection request!
+PING 10.0.0.100 (10.0.0.100) from 10.0.0.1: 56(84) bytes of data.
+64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=45.123 ms
+64 bytes from 10.0.0.3: icmp_seq=2 ttl=64 time=22.456 ms
+64 bytes from 10.0.0.2: icmp_seq=3 ttl=64 time=11.789 ms
+=== Simulation Complete ===
+
+Expected behavior: Traffic to VIP (10.0.0.100) distributed to backend servers
+Check controller logs for "Selected server" and "Load balanced" messages
+========================================
+
+Verification: Look for alternating responses from 10.0.0.2 and 10.0.0.3
+
+TEST 4: NS-3 BOTH VNFs (FIREWALL + LOAD BALANCER)
+------------------------------------------------
+Script: test_ns3_both.sh
+VNFs: Firewall + Load Balancer (combined functionality)
+Expected: Firewall blocks h1→h2, Load balancer distributes VIP traffic
+
+Command: ./test_ns3_both.sh
+
+Expected Output:
+========================================
+NS-3 SDN Test - Both VNFs
+========================================
+
+✅ Starting cleanup...
+Cleanup complete.
+
+Starting Ryu controller (Firewall + Load Balancer VNFs)...
+Controller PID: XXXXX
+Waiting for controller to initialize...
+
+Checking for unexpected connections...
+✅ No unexpected connections found.
+
+Running NS-3 simulation with both VNFs...
+=== Starting NS-3 SDN Simulation ===
+[dp 1] Controller accepted connection request!
+Testing combined VNF functionality...
+Firewall: Blocking h1→h2
+Load Balancer: Distributing VIP traffic
+=== Simulation Complete ===
+
+Expected behavior:
+- Firewall blocks h1→h2
+- Load balancer distributes VIP traffic to backend servers
+========================================
+
+Verification: Check controller logs for both "Blocking traffic" and "Load balanced" messages
+
+=== MININET AUTOMATED TESTS ===
+
+TEST 5: MININET BASIC L2 FORWARDING
+----------------------------------
+Script: test_mininet_basic.sh
+VNFs: None (basic MAC learning L2 switch)
+Expected: All hosts can ping each other
+
+Command: ./test_mininet_basic.sh
+
+Expected Output:
+========================================
+Mininet SDN Test - Basic L2 Forwarding
+========================================
+
+✅ Starting cleanup...
+Cleanup complete.
+
+Starting Ryu controller (Basic L2 Forwarding)...
+Controller PID: XXXXX
+Waiting for controller to initialize...
+
+Starting Mininet topology with Python script...
+*** Creating network
+*** Adding controller
+*** Adding hosts
+*** Adding switch
+*** Adding links
+*** Starting network
+
+Testing connectivity:
+*** h1 ping h2
+64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=0.123 ms
+64 bytes from 10.0.0.2: icmp_seq=2 ttl=64 time=0.089 ms
+
+*** h1 ping h3
+64 bytes from 10.0.0.3: icmp_seq=1 ttl=64 time=0.145 ms
+
+*** pingAll
+*** Results: 0% dropped (6/6 received)
+
+*** Stopping network
+
+Controller logs saved to: /tmp/controller_basic.log
+========================================
+
+Verification: Look for "0% dropped" in pingAll results
+
+TEST 6: MININET FIREWALL VNF
+---------------------------
+Script: test_mininet_firewall.sh
+VNFs: Firewall (blocks h1→h2 traffic)
+Expected: h1→h2 blocked, h1→h3 allowed, h2→h1 allowed
+
+Command: ./test_mininet_firewall.sh
+
+Expected Output:
+========================================
+Mininet SDN Test - Firewall VNF
+========================================
+
+✅ Starting cleanup...
+Cleanup complete.
+
+Starting Ryu controller (Firewall VNF)...
+Controller PID: XXXXX
+Waiting for controller to initialize...
+
+Starting Mininet topology with Python script...
+*** Creating network
+*** Adding controller
+*** Adding hosts
+*** Adding switch
+*** Starting network
+
+Testing Firewall VNF functionality:
+
+Test 1: h1 -> h2 (should be BLOCKED)
+PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
+--- 10.0.0.2 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss
+✅ PASS: h1->h2 correctly blocked by firewall
+
+Test 2: h1 -> h3 (should be ALLOWED)
+64 bytes from 10.0.0.3: icmp_seq=1 ttl=64 time=0.145 ms
+✅ PASS: h1->h3 allowed as expected
+
+Test 3: h2 -> h1 (should be ALLOWED)
+64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.134 ms
+✅ PASS: h2->h1 allowed as expected
+
+*** Stopping network
+
+Controller logs saved to: /tmp/controller_firewall.log
+
+========================================
+Test Results Summary:
+✅ All firewall tests PASSED!
+========================================
+
+Verification: All tests should show PASS status
+
+TEST 7: MININET LOAD BALANCER VNF
+--------------------------------
+Script: test_mininet_loadbalancer.sh
+VNFs: Load Balancer (distributes traffic to backend servers)
+Expected: VIP traffic distributed between h2 and h3
+
+Command: ./test_mininet_loadbalancer.sh
+
+Expected Output:
+========================================
+Mininet SDN Test - Load Balancer VNF
+========================================
+
+✅ Starting cleanup...
+Cleanup complete.
+
+Starting Ryu controller (Load Balancer VNF)...
+Controller PID: XXXXX
+Waiting for controller to initialize...
+
+Starting Mininet topology with Python script...
+*** Creating network
+*** Adding controller
+*** Adding hosts
+*** Configuring VIP on backend servers
+*** Adding switch
+*** Starting network
+
+Pinging VIP (10.0.0.100) 10 times to show distribution:
+64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=0.456 ms
+64 bytes from 10.0.0.3: icmp_seq=2 ttl=64 time=0.234 ms
+64 bytes from 10.0.0.2: icmp_seq=3 ttl=64 time=0.123 ms
+64 bytes from 10.0.0.3: icmp_seq=4 ttl=64 time=0.345 ms
+64 bytes from 10.0.0.2: icmp_seq=5 ttl=64 time=0.178 ms
+64 bytes from 10.0.0.3: icmp_seq=6 ttl=64 time=0.267 ms
+64 bytes from 10.0.0.2: icmp_seq=7 ttl=64 time=0.189 ms
+64 bytes from 10.0.0.3: icmp_seq=8 ttl=64 time=0.298 ms
+64 bytes from 10.0.0.2: icmp_seq=9 ttl=64 time=0.156 ms
+64 bytes from 10.0.0.3: icmp_seq=10 ttl=64 time=0.223 ms
+
+Traffic distributed between backend servers (h2: 10.0.0.2 and h3: 10.0.0.3)
+
+*** Stopping network
+
+Controller logs saved to: /tmp/controller_loadbalancer.log
+========================================
+
+Verification: Look for alternating responses from 10.0.0.2 and 10.0.0.3
+
+TEST 8: MININET BOTH VNFs (FIREWALL + LOAD BALANCER)
+---------------------------------------------------
+Script: test_mininet_both.sh
+VNFs: Firewall + Load Balancer (combined functionality)
+Expected: Firewall blocks h1→h2, Load balancer distributes VIP traffic
+
+Command: ./test_mininet_both.sh
+
+Expected Output:
+========================================
+Mininet SDN Test - Both VNFs
+========================================
+
+✅ Starting cleanup...
+Cleanup complete.
+
+Starting Ryu controller (Firewall + Load Balancer VNFs)...
+Controller PID: XXXXX
+Waiting for controller to initialize...
+
+Starting Mininet topology with Python script...
+*** Creating network
+*** Adding controller
+*** Adding hosts
+*** Configuring VIP on backend servers
+*** Adding switch
+*** Starting network
+
+Testing Combined VNF functionality:
+
+Test 1: Firewall - h1 -> h2 (should be BLOCKED)
+PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
+--- 10.0.0.2 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss
+✅ PASS: Firewall correctly blocked h1->h2
+
+Test 2: Normal connectivity - h1 -> h3 (should be ALLOWED)
+64 bytes from 10.0.0.3: icmp_seq=1 ttl=64 time=0.145 ms
+✅ PASS: Normal connectivity working
+
+Test 3: Load Balancer - h1 -> VIP (10.0.0.100)
+64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=0.456 ms
+64 bytes from 10.0.0.3: icmp_seq=2 ttl=64 time=0.234 ms
+64 bytes from 10.0.0.2: icmp_seq=3 ttl=64 time=0.123 ms
+64 bytes from 10.0.0.3: icmp_seq=4 ttl=64 time=0.345 ms
+64 bytes from 10.0.0.2: icmp_seq=5 ttl=64 time=0.178 ms
+✅ PASS: Load balancer distributing traffic correctly
+
+Test 4: Reverse connectivity - h2 -> h1 (should be ALLOWED)
+64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.134 ms
+✅ PASS: Reverse connectivity working
+
+*** Stopping network
+
+Controller logs saved to: /tmp/controller_both.log
+
+========================================
+Test Results Summary:
+✅ All 4 tests PASSED!
+========================================
+
+Verification: All 4 tests should show PASS status
+
+=== MASTER TEST SCRIPT ===
+
+MASTER SCRIPT: RUN ALL TESTS
+---------------------------
+Script: run_tests.sh
+Purpose: Interactive menu to run any or all tests
+
+Command: ./run_tests.sh
+
+Expected Output:
+==========================================
+      SDN Project - Master Test Suite
+==========================================
+
+This script will run all test scenarios:
+  NS-3 Tests: Basic, Firewall, Load Balancer, Both VNFs
+  Mininet Tests: Basic, Firewall, Load Balancer, Both VNFs
+
+==========================================
+Select Test to Run:
+==========================================
+NS-3 Tests:
+  1) Basic L2 Forwarding (No VNFs)
+  2) Firewall VNF
+  3) Load Balancer VNF
+  4) Both VNFs (Firewall + Load Balancer)
+
+Mininet Tests:
+  5) Basic L2 Forwarding (No VNFs)
+  6) Firewall VNF
+  7) Load Balancer VNF
+  8) Both VNFs (Firewall + Load Balancer)
+
+Batch Tests:
+  9) Run all NS-3 tests
+  10) Run all Mininet tests
+  11) Run ALL tests (NS-3 + Mininet)
+
+  0) Exit
+==========================================
+Enter choice [0-11]: 
+
+Usage Examples:
+- Run single NS-3 test: Choose option 1-4
+- Run single Mininet test: Choose option 5-8
+- Run all NS-3 tests sequentially: Choose option 9
+- Run all Mininet tests sequentially: Choose option 10
+- Run complete test suite: Choose option 11
+- Exit menu: Choose option 0
+
+=== TROUBLESHOOTING AUTOMATED TESTS ===
+
+ISSUE 1: NS-3 FAILS WITH 100% PACKET LOSS
+-----------------------------------------
+Problem: NS-3 simulation shows "100% packet loss" on second/subsequent runs
+Cause: Open vSwitch daemon (ovs-vswitchd) is auto-connecting to controller
+Solution:
+  Command: sudo systemctl stop openvswitch-switch
+  Command: sudo pkill -9 ovs-vswitchd
+  Command: sudo pkill -9 ovsdb-server
+
+Verification:
+  Command: sudo systemctl status openvswitch-switch
+  Expected: "inactive (dead)"
+  
+  Command: netstat -tn | grep :6653
+  Expected: No output (no connections on port 6653)
+
+ISSUE 2: SCRIPT PERMISSION DENIED
+--------------------------------
+Problem: "./test_ns3_basic.sh: Permission denied"
+Cause: Script not executable
+Solution:
+  Command: chmod +x test_ns3_basic.sh
+  
+Or make all scripts executable:
+  Command: chmod +x test_*.sh run_tests.sh
+
+ISSUE 3: CONTROLLER ALREADY RUNNING
+----------------------------------
+Problem: "Address already in use" when starting controller
+Cause: Previous controller instance still running
+Solution:
+  Command: sudo pkill -9 -f ryu-manager
+  Command: sudo lsof -ti:6653 | xargs sudo kill -9
+
+Verification:
+  Command: ps aux | grep ryu-manager
+  Expected: No ryu-manager processes
+
+ISSUE 4: TAP INTERFACE ALREADY EXISTS
+------------------------------------
+Problem: "Device or resource busy" when creating TAP interface
+Cause: Previous TAP interface (ctrl) still exists
+Solution:
+  Command: sudo ip link delete ctrl
+  Command: sudo mn -c  # Clean Mininet
+
+Verification:
+  Command: ip link show ctrl
+  Expected: "Device ctrl does not exist"
+
+ISSUE 5: MININET NETWORK STILL RUNNING
+-------------------------------------
+Problem: Cannot start new Mininet test, previous network still active
+Cause: Previous Mininet instance not cleaned up
+Solution:
+  Command: sudo mn -c
+  Command: sudo killall -9 ovs-vswitchd ovs-vsctl ovsdb-server
+
+Verification:
+  Command: sudo mn -c
+  Expected: "*** Removing junk from /tmp"
+
+ISSUE 6: NS-3 BUILD NOT FOUND
+----------------------------
+Problem: "./ns3 run: command not found"
+Cause: NS-3 not built or not in correct directory
+Solution:
+  1. Navigate to NS-3 directory:
+     Command: cd ~/workspace/bake/source/ns-3.38
+  
+  2. Verify NS-3 built:
+     Command: ls build/scratch/ns3.38-topology-default
+     Expected: File exists
+  
+  3. If not built:
+     Command: ./ns3 build
+
+ISSUE 7: PYTHON SCRIPT SYNTAX ERROR
+----------------------------------
+Problem: Mininet script fails with Python syntax error
+Cause: Python 2 vs Python 3 compatibility issue
+Solution:
+  Use Python 3 explicitly:
+  Command: sudo python3 mininet/topology.py
+
+Verification:
+  Command: python3 --version
+  Expected: Python 3.8 or newer
+
+=== DEBUGGING TIPS ===
+
+1. CHECK CONTROLLER LOGS
+   Location: /tmp/controller_*.log
+   Command: tail -f /tmp/controller_basic.log
+   Look for: "SWITCH CONNECTED", "Packet in", "Installing flow"
+
+2. CHECK NETWORK CONNECTIONS
+   Command: netstat -tn | grep :6653
+   Expected for NS-3: 1 ESTABLISHED connection
+   Expected for Mininet: 1 ESTABLISHED connection
+
+3. CHECK PROCESS STATUS
+   Command: ps aux | grep ryu-manager
+   Expected: One ryu-manager process running
+
+4. CHECK TAP INTERFACE
+   Command: ip link show ctrl
+   Expected: TAP interface exists with state UP
+
+5. CHECK OVS STATUS (FOR NS-3)
+   Command: sudo systemctl status openvswitch-switch
+   Expected: "inactive (dead)" for NS-3 tests
+   Expected: "active (running)" for Mininet tests
+
+6. VERIFY NETWORK TOPOLOGY
+   Command: sudo ovs-vsctl show  # For Mininet
+   Expected: Shows bridge, controller connection, and ports
+
+7. TEST CONTROLLER CONNECTIVITY
+   Command: telnet 127.0.0.1 6653
+   Expected: "Connected to 127.0.0.1"
+   Type: Ctrl+] then "quit" to exit
+
+=== SCRIPT DESCRIPTIONS ===
+
+test_ns3_basic.sh:
+  - Tests basic L2 MAC learning with NS-3 simulator
+  - No VNFs, just controller and switch
+  - Expected: All pings succeed with 0% packet loss
+  - Duration: ~30 seconds
+
+test_ns3_firewall.sh:
+  - Tests firewall VNF blocking h1→h2 traffic in NS-3
+  - Loads firewall_vnf.py alongside controller
+  - Expected: 100% packet loss due to firewall blocking
+  - Duration: ~30 seconds
+
+test_ns3_loadbalancer.sh:
+  - Tests load balancer VNF distributing traffic in NS-3
+  - Loads load_balancer_vnf.py alongside controller
+  - Expected: Traffic to VIP distributed to backend servers
+  - Duration: ~30 seconds
+
+test_ns3_both.sh:
+  - Tests combined firewall + load balancer in NS-3
+  - Loads both firewall_vnf.py and load_balancer_vnf.py
+  - Expected: Firewall blocks specific traffic, LB distributes VIP traffic
+  - Duration: ~30 seconds
+
+test_mininet_basic.sh:
+  - Tests basic L2 MAC learning with Mininet emulator
+  - Uses inline Python script for topology creation
+  - Expected: All hosts can ping each other (0% dropped)
+  - Duration: ~15 seconds
+
+test_mininet_firewall.sh:
+  - Tests firewall VNF blocking h1→h2 traffic in Mininet
+  - Includes PASS/FAIL validation for each test
+  - Expected: h1→h2 blocked, h1→h3 allowed, h2→h1 allowed
+  - Duration: ~15 seconds
+
+test_mininet_loadbalancer.sh:
+  - Tests load balancer VNF distributing traffic in Mininet
+  - Configures VIP 10.0.0.100 on backend servers
+  - Expected: Traffic alternates between h2 and h3
+  - Duration: ~15 seconds
+
+test_mininet_both.sh:
+  - Tests combined firewall + load balancer in Mininet
+  - Comprehensive validation with 4 separate tests
+  - Expected: All 4 tests show PASS status
+  - Duration: ~20 seconds
+
+run_tests.sh:
+  - Master script with interactive menu
+  - Can run individual tests or batch tests
+  - Pauses between tests for review
+  - Duration: Depends on selections
+
+===================================================================
+                   TRACK 11: PERFORMANCE ANALYSIS
 ===================================================================
 
 PREREQUISITES:

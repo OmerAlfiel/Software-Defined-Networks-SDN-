@@ -1,5 +1,52 @@
 # SDN Project with OpenFlow and Network Function Virtualization
 
+## 🚀 Quick Start - Automated Testing (NEW!)
+
+**We now have comprehensive automated test scripts for all scenarios!**
+
+```bash
+# Make scripts executable (first time only)
+chmod +x test_*.sh run_tests.sh
+
+# Run interactive menu
+./run_tests.sh
+```
+
+**CRITICAL for NS-3 tests:** Stop Open vSwitch daemon before running:
+
+```bash
+sudo systemctl stop openvswitch-switch
+sudo pkill -9 ovs-vswitchd
+```
+
+📚 **See our testing guides:**
+
+- [TESTING_QUICK_REFERENCE.md](TESTING_QUICK_REFERENCE.md) - Quick reference for all tests
+- [TEST_SCRIPTS_SUMMARY.md](TEST_SCRIPTS_SUMMARY.md) - Summary of what was created
+- [SDN_Implementation_Guide.txt](SDN_Implementation_Guide.txt) - Complete implementation guide with TRACK 10: AUTOMATED TEST SCRIPTS
+
+### Available Test Scripts
+
+**NS-3 Tests (Simulation):**
+
+- `test_ns3_basic.sh` - Basic L2 forwarding
+- `test_ns3_firewall.sh` - Firewall VNF
+- `test_ns3_loadbalancer.sh` - Load Balancer VNF
+- `test_ns3_both.sh` - Both VNFs combined
+
+**Mininet Tests (Emulation):**
+
+- `test_mininet_basic.sh` - Basic L2 forwarding
+- `test_mininet_firewall.sh` - Firewall VNF with PASS/FAIL validation
+- `test_mininet_loadbalancer.sh` - Load Balancer VNF
+- `test_mininet_both.sh` - Both VNFs with comprehensive validation
+
+**Master Script:**
+
+- `run_tests.sh` - Interactive menu to run any or all tests
+
+---
+
 ## Overview
 
 This project implements a **Software-Defined Network (SDN)** with **Network Function Virtualization (NFV)** using **NS-3** simulation and the **Ryu controller**. It demonstrates the SDN paradigm by separating the control plane from the data plane and virtualizing network functions such as firewall and load balancer.
@@ -21,7 +68,6 @@ This project implements a **Software-Defined Network (SDN)** with **Network Func
 ### Components
 
 - **NS-3 Simulation Environment**: Virtual network with 3 hosts and one OpenFlow switch
-  
 - **OFSwitch13 Module**: Enables OpenFlow 1.3 in NS-3
 - **TAP Bridge**: Links NS-3 simulation to the host OS
 - **Ryu Controller**: External SDN controller with:
@@ -122,7 +168,7 @@ The NS-3 simulation initializes the topology, establishes connections, and then 
 - Blocks specific MAC/TCP/UDP traffic
 - Stateful filtering (connection tracking)
 - Example rules:
-  
+
 ```python
 self.firewall_rules = [
   {'name': 'h1→h2', 'src_mac': '00:00:00:00:00:01', 'dst_mac': '00:00:00:00:00:02', 'action': 'block'},
@@ -222,6 +268,51 @@ This approach offers several advantages:
 ---
 
 ## Testing & Validation
+
+### 🤖 Automated Testing (Recommended)
+
+We provide **9 automated test scripts** covering all scenarios. Each script includes:
+
+- ✅ Proper cleanup (controllers, OVS, TAP, Mininet)
+- ✅ Error checking and validation
+- ✅ Clear expected outputs
+- ✅ PASS/FAIL indicators (Mininet tests)
+
+**Quick Start:**
+
+```bash
+# Run master menu
+./run_tests.sh
+
+# Or run individual tests
+./test_mininet_basic.sh         # Quick basic test
+./test_mininet_firewall.sh      # Show PASS/FAIL validation
+./test_mininet_loadbalancer.sh  # Show distribution
+./test_mininet_both.sh          # Show combined VNFs
+```
+
+**For NS-3 tests, first stop OVS:**
+
+```bash
+sudo systemctl stop openvswitch-switch
+./test_ns3_basic.sh
+```
+
+See [TESTING_QUICK_REFERENCE.md](TESTING_QUICK_REFERENCE.md) for complete guide.
+
+### 📊 Expected Results
+
+| Test          | Platform | Expected Output                       |
+| ------------- | -------- | ------------------------------------- |
+| Basic         | NS-3     | 5 packets, 0% packet loss             |
+| Firewall      | NS-3     | 5 packets, 100% packet loss (blocked) |
+| Load Balancer | NS-3     | Alternating server responses          |
+| Basic         | Mininet  | 0% dropped (6/6 received)             |
+| Firewall      | Mininet  | 3 PASS tests                          |
+| Load Balancer | Mininet  | Alternating servers                   |
+| Both VNFs     | Mininet  | 4 PASS tests                          |
+
+### Manual Testing (Original Method)
 
 ### Connectivity Tests
 
