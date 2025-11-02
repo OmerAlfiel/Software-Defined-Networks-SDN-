@@ -5,6 +5,37 @@ echo "=== Mininet Test: Load Balancer VNF ==="
 echo "Testing load balancer with VIP 10.0.0.100"
 echo ""
 
+# Setup Open vSwitch function
+setup_ovs() {
+    echo "=========================================="
+    echo "Setting up Open vSwitch for Mininet..."
+    echo "=========================================="
+    
+    # Check if OVS is installed
+    if ! command -v ovs-vsctl &> /dev/null; then
+        echo "⚠️  Open vSwitch not found. Installing..."
+        sudo apt-get update
+        sudo apt-get install -y openvswitch-switch openvswitch-common
+    else
+        echo "✅ Open vSwitch is installed"
+    fi
+    
+    # Start Open vSwitch service
+    echo "Starting Open vSwitch service..."
+    sudo service openvswitch-switch start 2>/dev/null || sudo systemctl start openvswitch-switch 2>/dev/null
+    sleep 2
+    
+    # Verify service is running
+    if sudo ovs-vsctl show &> /dev/null; then
+        echo "✅ Open vSwitch is running"
+        echo ""
+    else
+        echo "❌ ERROR: Open vSwitch failed to start!"
+        echo "Please run: sudo service openvswitch-switch start"
+        exit 1
+    fi
+}
+
 # Cleanup function
 cleanup() {
     echo "Performing cleanup..."
@@ -13,19 +44,27 @@ cleanup() {
     sleep 2
 }
 
+# Setup OVS before cleanup
+setup_ovs
+
 # Initial cleanup
 cleanup
 
+# Wait for cleanup to complete fully
+sleep 1
+
 # Start controller with load balancer VNF
 echo "Starting controller with Load Balancer VNF..."
-ryu-manager controller/sdn_controller.py controller/load_balancer_vnf.py > /tmp/controller_loadbalancer.log 2>&1 &
+ryu-manager controller/sdn_controller.py controller/load_balancer_vnf.py > ~/controller_loadbalancer.log 2>&1 &
 CONTROLLER_PID=$!
-sleep 3
+sleep 5
 
 # Verify controller
 if ! netstat -tln | grep -q ":6653"; then
     echo "❌ ERROR: Controller failed to start!"
-    cat /tmp/controller_loadbalancer.log
+    if [ -f ~/controller_loadbalancer.log ]; then
+        cat ~/controller_loadbalancer.log
+    fi
     exit 1
 fi
 echo "✅ Controller ready with Load Balancer VNF"
@@ -41,10 +80,10 @@ from mininet.net import Mininet
 from mininet.node import RemoteController
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
-from mininet.clean import cleanup
 
 def test_loadbalancer():
-    cleanup()
+    # Don't call cleanup() here - it kills the controller!
+    # Cleanup was already done by the bash script
     
     net = Mininet(controller=RemoteController)
     
@@ -74,24 +113,34 @@ def test_loadbalancer():
     h2.cmd('ip addr add 10.0.0.100/24 dev h2-eth0')
     h3.cmd('ip addr add 10.0.0.100/24 dev h3-eth0')
     
-    info('\n*** Load Balancer Test 1: Ping VIP from h1\n')
+    info('\n*** Load Balancer Test 1: Ping VIP from h1 (10 pings)\n')
     result = h1.cmd('ping -c 10 10.0.0.100')
     print(result)
     if '0% packet loss' in result:
-        print('✅ PASS: VIP is reachable')
+        print('✅ PASS: VIP 10.0.0.100 is reachable (0% packet loss)')
     else:
-        print('❌ FAIL: VIP is not reachable!')
+        print('❌ FAIL: VIP 10.0.0.100 is not reachable!')
     
     info('\n*** Load Balancer Test 2: Direct ping to h2\n')
     result = h1.cmd('ping -c 3 10.0.0.2')
     print(result)
+    if '0% packet loss' in result:
+        print('✅ PASS: Direct connection to h2 works')
+    else:
+        print('⚠️  WARNING: Direct connection to h2 failed')
     
     info('\n*** Load Balancer Test 3: Direct ping to h3\n')
     result = h1.cmd('ping -c 3 10.0.0.3')
     print(result)
+    if '0% packet loss' in result:
+        print('✅ PASS: Direct connection to h3 works')
+    else:
+        print('⚠️  WARNING: Direct connection to h3 failed')
     
-    info('\n*** Check controller logs to see load balancing distribution\n')
-    print('Note: Controller log at /tmp/controller_loadbalancer.log')
+    info('\n=== Load Balancer Test Summary ===\n')
+    print('Expected: VIP traffic distributed between h2 (10.0.0.2) and h3 (10.0.0.3)')
+    print('Check controller logs for "Selected server" messages showing distribution')
+    print('Note: Controller log at ~/controller_loadbalancer.log')
     
     info('\n*** Network is ready. Type "exit" to close.\n')
     CLI(net)
@@ -104,12 +153,35 @@ if __name__ == '__main__':
     test_loadbalancer()
 PYTHON_SCRIPT
 
+# Display logs BEFORE cleanup
+echo ""
+echo "=========================================="
+echo "Controller Logs (last 30 lines):"
+echo "=========================================="
+if [ -f ~/controller_loadbalancer.log ]; then
+    tail -30 ~/controller_loadbalancer.log
+else
+    echo "❌ No controller log file found!"
+fi
+
+echo ""
+echo "=========================================="
+echo "Load Balancer-specific logs:"
+echo "=========================================="
+if [ -f ~/controller_loadbalancer.log ]; then
+    grep -i "load.balanc\|selected.server\|VIP" ~/controller_loadbalancer.log | tail -20
+else
+    echo "❌ No load balancer logs found!"
+fi
+
 # Cleanup
 echo ""
-cleanup
+echo "Performing cleanup..."
 kill $CONTROLLER_PID 2>/dev/null
 wait $CONTROLLER_PID 2>/dev/null
+cleanup
 
 echo ""
 echo "=== Test Complete ==="
-echo "Controller log saved to: /tmp/controller_loadbalancer.log"
+echo "Full controller log: ~/controller_loadbalancer.log"
+echo "Note: Look for 'Selected server' and traffic distribution messages"

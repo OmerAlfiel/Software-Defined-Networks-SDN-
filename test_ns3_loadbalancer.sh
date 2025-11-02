@@ -22,7 +22,7 @@ cleanup
 
 # Start controller with load balancer VNF
 echo "Starting controller with Load Balancer VNF..."
-ryu-manager controller/sdn_controller.py controller/load_balancer_vnf.py &
+ryu-manager controller/sdn_controller.py controller/load_balancer_vnf.py > /tmp/controller_loadbalancer.log 2>&1 &
 CONTROLLER_PID=$!
 sleep 3
 
@@ -45,18 +45,61 @@ echo "✅ No unexpected connections"
 
 # Run NS-3
 echo ""
-echo "Running NS-3 simulation..."
-echo "Expected: Traffic to VIP 10.0.0.100 should be distributed to backend servers"
+echo "=========================================="
+echo "Running NS-3 Load Balancer Test..."
+echo "=========================================="
+echo "Expected: Traffic to VIP 10.0.0.100 distributed to backend servers"
+echo "Load balancer should select h2 (10.0.0.2) or h3 (10.0.0.3)"
 echo ""
 cd ~/workspace/bake/source/ns-3.38
-./ns3 run "scratch/topology" --enable-sudo
+./ns3 run "scratch/topology --destination=10.0.0.100" --enable-sudo
+
+# Display logs BEFORE cleanup
+echo ""
+echo "=========================================="
+echo "Controller Logs (last 30 lines):"
+echo "=========================================="
+if [ -f /tmp/controller_loadbalancer.log ]; then
+    tail -30 /tmp/controller_loadbalancer.log
+    
+    # Check for success indicators
+    echo ""
+    echo "=========================================="
+    echo "Test Result Analysis:"
+    echo "=========================================="
+    if grep -q "VIP 10.0.0.100 configured" /tmp/controller_loadbalancer.log; then
+        echo "✅ VIP configured on backend servers"
+    fi
+    if grep -q "Load Balancer VNF initialized" /tmp/controller_loadbalancer.log; then
+        echo "✅ Load balancer VNF initialized"
+    fi
+    if grep -q "selected server" /tmp/controller_loadbalancer.log; then
+        echo "✅ Load balancer actively distributing traffic"
+    fi
+else
+    echo "❌ No controller log file found!"
+fi
+
+echo ""
+echo "=========================================="
+echo "Load Balancer-specific logs:"
+echo "=========================================="
+if [ -f /tmp/controller_loadbalancer.log ]; then
+    grep -i "load.balanc\|selected.server\|VIP" /tmp/controller_loadbalancer.log | tail -20
+    echo ""
+    echo "Expected: Look for 'Selected server 10.0.0.2' or 'Selected server 10.0.0.3'"
+else
+    echo "❌ No load balancer logs found!"
+fi
 
 # Cleanup
 echo ""
-cleanup
+echo "Performing cleanup..."
 kill $CONTROLLER_PID 2>/dev/null
 wait $CONTROLLER_PID 2>/dev/null
+cleanup
 
 echo ""
 echo "=== Test Complete ==="
-echo "Note: Check controller logs to see load balancing decisions"
+echo "Full controller log: /tmp/controller_loadbalancer.log"
+echo "Note: Look for 'Selected server' and 'Load balanced' messages"

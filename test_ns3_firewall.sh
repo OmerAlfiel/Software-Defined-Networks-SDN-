@@ -22,7 +22,7 @@ cleanup
 
 # Start controller with firewall VNF
 echo "Starting controller with Firewall VNF..."
-ryu-manager controller/sdn_controller.py controller/firewall_vnf.py &
+ryu-manager controller/sdn_controller.py controller/firewall_vnf.py > /tmp/controller_firewall.log 2>&1 &
 CONTROLLER_PID=$!
 sleep 3
 
@@ -45,18 +45,58 @@ echo "✅ No unexpected connections"
 
 # Run NS-3
 echo ""
-echo "Running NS-3 simulation..."
-echo "Expected: h1→h2 blocked by firewall (ping may fail or succeed to other hosts)"
+echo "=========================================="
+echo "Running NS-3 Firewall Test..."
+echo "=========================================="
+echo "Expected: h1→h2 should be BLOCKED (100% packet loss)"
+echo "Firewall rule: Block all traffic from 10.0.0.1 to 10.0.0.2"
 echo ""
 cd ~/workspace/bake/source/ns-3.38
 ./ns3 run "scratch/topology" --enable-sudo
 
+# Display logs BEFORE cleanup
+echo ""
+echo "=========================================="
+echo "Controller Logs (last 30 lines):"
+echo "=========================================="
+if [ -f /tmp/controller_firewall.log ]; then
+    tail -30 /tmp/controller_firewall.log
+    
+    # Check for success indicators
+    echo ""
+    echo "=========================================="
+    echo "Test Result Analysis:"
+    echo "=========================================="
+    if grep -q "Installed firewall rule" /tmp/controller_firewall.log; then
+        echo "✅ Firewall rules installed successfully"
+    fi
+    if grep -q "Block 10.0.0.1.*10.0.0.2" /tmp/controller_firewall.log; then
+        echo "✅ h1→h2 blocking rule active"
+    fi
+else
+    echo "❌ No controller log file found!"
+fi
+
+echo ""
+echo "=========================================="
+echo "Firewall-specific logs:"
+echo "=========================================="
+if [ -f /tmp/controller_firewall.log ]; then
+    grep -i "firewall\|blocked\|block" /tmp/controller_firewall.log | tail -20
+    echo ""
+    echo "Expected: Look for 'Block 10.0.0.1 → 10.0.0.2' messages"
+else
+    echo "❌ No firewall logs found!"
+fi
+
 # Cleanup
 echo ""
-cleanup
+echo "Performing cleanup..."
 kill $CONTROLLER_PID 2>/dev/null
 wait $CONTROLLER_PID 2>/dev/null
+cleanup
 
 echo ""
 echo "=== Test Complete ==="
-echo "Note: Check controller logs to verify firewall rules were applied"
+echo "Full controller log: /tmp/controller_firewall.log"
+echo "Note: Look for 'blocked' or '100% packet loss' to verify firewall is working"

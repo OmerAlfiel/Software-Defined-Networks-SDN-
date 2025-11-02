@@ -22,7 +22,7 @@ cleanup
 
 # Start basic controller (no VNFs)
 echo "Starting basic controller (L2 forwarding only)..."
-ryu-manager controller/sdn_controller.py &
+ryu-manager controller/sdn_controller.py > /tmp/controller_basic.log 2>&1 &
 CONTROLLER_PID=$!
 sleep 3
 
@@ -45,16 +45,50 @@ echo "✅ No unexpected connections"
 
 # Run NS-3
 echo ""
-echo "Running NS-3 simulation..."
-echo "Expected: All pings should succeed (0% packet loss)"
+echo "=========================================="
+echo "Running NS-3 Basic Test..."
+echo "=========================================="
+echo "Expected: All pings should succeed with 0% packet loss"
+echo "This validates basic L2 MAC learning and forwarding"
+echo ""
 cd ~/workspace/bake/source/ns-3.38
 ./ns3 run "scratch/topology" --enable-sudo
 
+# Display logs BEFORE cleanup
+echo ""
+echo "=========================================="
+echo "Controller Logs (last 30 lines):"
+echo "=========================================="
+if [ -f /tmp/controller_basic.log ]; then
+    tail -30 /tmp/controller_basic.log
+    
+    # Check for success indicators
+    echo ""
+    echo "=========================================="
+    echo "Test Result Analysis:"
+    echo "=========================================="
+    if grep -q "Table-miss flow entry installed" /tmp/controller_basic.log; then
+        echo "✅ Controller connected to switch successfully"
+    fi
+    if grep -q "Packet in switch" /tmp/controller_basic.log; then
+        echo "✅ Controller receiving packet_in messages"
+    fi
+    if grep -q "SWITCH CONNECTED" /tmp/controller_basic.log; then
+        echo "✅ Switch registered with controller"
+    fi
+    echo ""
+    echo "Expected: MAC learning should show packets from h1, h2, h3"
+else
+    echo "❌ No controller log file found!"
+fi
+
 # Cleanup
 echo ""
-cleanup
+echo "Performing cleanup..."
 kill $CONTROLLER_PID 2>/dev/null
 wait $CONTROLLER_PID 2>/dev/null
+cleanup
 
 echo ""
 echo "=== Test Complete ==="
+echo "Full controller log: /tmp/controller_basic.log"

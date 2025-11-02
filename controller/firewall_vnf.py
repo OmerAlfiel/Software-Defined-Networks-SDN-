@@ -15,8 +15,10 @@ class L2SwitchWithFirewall(app_manager.RyuApp):
         self.mac_to_port = {}
         # Firewall rules definition
         self.firewall_rules = [
-            # Block all traffic from h1 to h2
-            {'name': 'h1→h2', 'src_mac': '00:00:00:00:00:01', 'dst_mac': '00:00:00:00:00:02', 'action': 'block'},
+            # Block all traffic from h1 to h2 (IP-based - more reliable than MAC)
+            {'name': 'h1→h2-IP', 'src_ip': '10.0.0.1', 'dst_ip': '10.0.0.2', 'action': 'block'},
+            # Block all traffic from h1 to h2 (MAC-based backup)
+            {'name': 'h1→h2-MAC', 'src_mac': '00:00:00:00:00:01', 'dst_mac': '00:00:00:00:00:02', 'action': 'block'},
             # Block TCP traffic to h3 on port 80 (HTTP)
             {'name': 'http→h3', 'dst_mac': '00:00:00:00:00:03', 'tcp_dst_port': 80, 'action': 'block'},
             # Block UDP traffic from h1 to h3 on port 53 (DNS)
@@ -33,11 +35,31 @@ class L2SwitchWithFirewall(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         
-        # Install the table-miss flow entry
+        # Install proactive firewall rules BEFORE table-miss
+        self.logger.info("Installing proactive firewall rules on switch %s", datapath.id)
+        
+        # Rule 1: Block h1→h2 (IP-based)
+        match = parser.OFPMatch(
+            eth_type=ether_types.ETH_TYPE_IP,
+            ipv4_src='10.0.0.1',
+            ipv4_dst='10.0.0.2'
+        )
+        self.add_flow(datapath, 100, match, [], hard_timeout=0)  # Priority 100, permanent
+        self.logger.info("🔥 Installed firewall rule: Block 10.0.0.1 → 10.0.0.2")
+        
+        # Rule 2: Block h1→h2 (MAC-based backup)
+        match = parser.OFPMatch(
+            eth_src='00:00:00:00:00:01',
+            eth_dst='00:00:00:00:00:02'
+        )
+        self.add_flow(datapath, 100, match, [], hard_timeout=0)
+        self.logger.info("🔥 Installed firewall rule: Block 00:00:00:00:00:01 → 00:00:00:00:00:02")
+        
+        # Install the table-miss flow entry (priority 0 - lowest)
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
-        self.logger.info("Firewall switch features handler for switch %s", datapath.id)
+        self.logger.info("Firewall table-miss flow installed on switch %s", datapath.id)
     
     def add_flow(self, datapath, priority, match, actions, buffer_id=None, idle_timeout=0, hard_timeout=0):
         ofproto = datapath.ofproto
@@ -208,3 +230,7 @@ class L2SwitchWithFirewall(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
+
+        
+        # Check controller logs
+        # cat /tmp/controller.log | tail -30
